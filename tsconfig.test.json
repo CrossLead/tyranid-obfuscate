@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es5",
+    "moduleResolution": "node",
+    "target": "es2015",
     "outDir": "lib_test",
+    "skipLibCheck": true,
     "declaration": false,
     "noImplicitAny": true,
     "removeComments": true,
     "inlineSourceMap": true
   },
-  "include": [
-    "test/**/*"
-  ]
+  "include": ["./test/*.ts"]
 }
