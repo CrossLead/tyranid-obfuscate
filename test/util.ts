@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { Db, MongoClient } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Tyr } from 'tyranid';
+import data from './config/users';
 
 export const User = new Tyr.Collection({
   id: 'u00',
@@ -40,28 +41,30 @@ export class DBManager {
     const options = {
       db: this.db,
       mongoClient: this.connection,
-      // consoleLogLevel: false,
+      validate: [{ glob: `${__dirname}/config/model/*` }],
       dbLogLevel: "INFO" as "INFO"
     };
 
-    await Tyr.config({});
     await Tyr.config(options);
 
-    Tyr.validate();
+    await Tyr.validate();
 
-    // TODO: get path dynamically
-    const obj = JSON.parse(fs.readFileSync('/Users/adam/Documents/opensource/tyranid-obfuscate/test/data/users.json', 'utf8'));
-    obj.forEach((o: any) => {
-      User.insert(o);
-    });
-
+    await User.insert(data);
+    console.log(`Database Up, Collections ${Tyr.collections}`);
     return this.db;
   }
 
-  stop() {
+  public isRunning() {
+    return this.connection.isConnected();
+  }
+
+  /**
+   * In-memory server, data is not persisted after the service
+   * is stopped.
+   */
+  public async stop() {
+    console.log("Server Stop");
     this.connection.close();
     return this.server.stop();
   }
-
-  cleanup() {}
 }

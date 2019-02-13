@@ -10,5 +10,5 @@
     "removeComments": true,
     "inlineSourceMap": true
   },
-  "include": ["./test/*.ts"]
+  "include": ["./test/**/*"]
 }
