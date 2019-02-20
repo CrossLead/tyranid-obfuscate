@@ -1,25 +1,47 @@
-import * as fs from 'fs';
-import { Db, MongoClient } from 'mongodb';
+import { Db, MongoClient, ObjectID } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Tyr } from 'tyranid';
-import data from './config/users';
+import * as TyrObfuscator from '../src';
+import TestDataSet from './datasets/users';
+
+
+TyrObfuscator.validate();
+
+export interface User extends Tyr.Document<ObjectID> {
+  firstName: string;
+  lastName: string;
+  gender: string;
+  ip_address: string;
+  createdAt: Date;
+  _id: ObjectID;
+}
+
+/**
+ * Type 'User' does not satisfy the constraint 'AnyIdType'.
+ * Type 'User' is missing the following properties from type 
+ * 'ObjectID': generationTime, equals, generate, getTimestamp, toHexString
+ */
+export interface UserCollection extends Tyr.ObfuscateableCollectionInstance {
+};
+
 
 export const User = new Tyr.Collection({
   id: 'u00',
   name: 'user',
-  dbName: 'users',
+  dbName: 'dbTest',
   fields: {
     _id: { is: 'mongoid' },
     email: { is: 'email' },
-    firstName: { is: 'string', required: true },
-    lastName: { is: 'string' },
+    firstName: { is: 'string', obfuscateable: true, required: true }, 
+    lastName: { is: 'string', obfuscateable: true },
     gender: { is: 'string' },
-    ip_address: { is: 'string' },
+    ip_address: { is: 'string', obfuscateable:true,  required: true},
     createdAt: { is: 'date' }
+  },
+  obfuscateConfig:{
+    metadataCollectionName: 'userObfuscateMetaData'
   }
-});
-
-const COLLECTIONS = [User];
+}) as UserCollection;
 
 export class DBManager {
   private connection: MongoClient;
@@ -27,29 +49,32 @@ export class DBManager {
   private server: MongoMemoryServer;
 
   constructor() {
+    
     this.db = null;
     this.server = new MongoMemoryServer();
     this.connection = null;
   }
 
   public async start() {
-    console.log('STARTING');
+    console.log('STARTING DATABASE');
     const url = await this.server.getConnectionString();
     this.connection = await MongoClient.connect(url, { useNewUrlParser: true });
-    this.db = this.connection.db(await this.server.getDbName());
-
-    const options = {
+    const serverName = await this.server.getDbName();
+    this.db = this.connection.db(serverName);
+    
+    const options : Tyr.ConfigOptions = {
       db: this.db,
       mongoClient: this.connection,
-      validate: [{ glob: `${__dirname}/config/model/*` }],
-      dbLogLevel: "INFO" as "INFO"
+      dbLogLevel: "INFO"
     };
 
     await Tyr.config(options);
-
+ 
+    // Still need this explicit even when validate set on config 
     await Tyr.validate();
 
-    await User.insert(data);
+
+    await User.insert(TestDataSet);
     console.log(`Database Up, Collections ${Tyr.collections}`);
     return this.db;
   }
