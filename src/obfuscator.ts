@@ -3,7 +3,7 @@
 import { Tyr } from "tyranid";
 import { Cursor, Collection, FilterQuery, BulkWriteResult, UpdateWriteOpResult, UnorderedBulkOperation } from "mongodb";
 import { Timestamp, ObjectId, ObjectID } from 'bson';
-import { AesUtil } from '../src/encryptor';
+import { AesUtil } from './encryptor';
 import { emit } from "cluster";
 
 const defaultBatchSize = 500;

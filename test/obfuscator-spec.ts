@@ -5,14 +5,13 @@ import TestDataSet from './datasets/users';
 import { DBManager, User } from './util';
 import {ExpectedResults, createMaskingValuesCollection } from './datasets/expected-results';
 import * as fs from 'fs';
-import { isTypeQueryNode } from 'typescript';
 
 let dbManager: DBManager;
 const masterKey = '123456';
 const copiedPIICollection = new Tyr.Collection({
   id: '_c1',
-  name: 'copypasta',
-  dbName: 'copypasta',
+  name: 'copiedData',
+  dbName: 'copiedData',
   internal: false,
   fields: {
     _id: { is: 'mongoid' },
