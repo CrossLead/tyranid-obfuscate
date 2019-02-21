@@ -64,13 +64,13 @@ Tyr.copyObfuscateableData = async (query: Tyr.MongoQuery, sourceCollection: Tyr.
 // TODO: recovery of mid encryption failure
 // TODO: trace logging
 Tyr.encryptCollection = async (collection: Tyr.CollectionInstance, masterKey: string) => {
-  await encryptDecryptData(collection, masterKey, false);
+  await encryptDecryptData(collection, masterKey, {}, false);
 }
 
-const encryptDecryptData = async (collection: Tyr.CollectionInstance, masterKey: string, decrypt?: boolean) => {
+const encryptDecryptData = async (collection: Tyr.CollectionInstance, masterKey: string, query: Tyr.MongoQuery, decrypt?: boolean) => {
 
   const aesUtil = new AesUtil(masterKey);
-  const cursor = await collection.db.find({});
+  const cursor = await collection.db.find(query);
   let bulkOp = collection.db.initializeUnorderedBulkOp();
 
   const count = await cursor.count();
@@ -100,7 +100,9 @@ const encryptDocument = (doc: any, aesUtil: AesUtil, decrypt?: boolean): object 
     if (key !== "_id") {
       //Encryption util is simplistic right now
       //should replace with established library
-      encObj[key] = decrypt ? aesUtil.decrypt(doc[key]) : aesUtil.encryptString(doc[key]);
+      const val = doc[key];
+      //simple attempt at supporting datatypes other than string
+      encObj[key] = decrypt ? aesUtil.decrypt(doc[key]) : aesUtil.encryptString((typeof val === 'string') ? val : JSON.stringify(val));
     }
   });
 
@@ -111,8 +113,7 @@ Tyr.restoreObfuscatedData = async (targetCollection: Tyr.CollectionInstance, sou
   //decrypt collection
   if (decryptionKey) {
     // need better method naming
-    // TODO: Doesn't support subset
-    await encryptDecryptData(sourceCollection, decryptionKey, true);
+    await encryptDecryptData(sourceCollection, decryptionKey, query, true);
   }
   //migrate data back to targetCollection
   await migrateData(targetCollection, sourceCollection, query);
