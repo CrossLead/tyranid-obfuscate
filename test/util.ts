@@ -1,7 +1,7 @@
 import { Db, MongoClient, ObjectID } from 'mongodb';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Tyr } from 'tyranid';
-import * as TyrObfuscator from '../src/obfuscator';
+import * as TyrObfuscator from '../src/index';
 import TestDataSet from './datasets/users';
 
 
