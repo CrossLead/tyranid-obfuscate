@@ -22,9 +22,6 @@ export const User = new Tyr.Collection({
     gender: { is: 'string' },
     ip_address: { is: 'string', obfuscateable:true,  required: true},
     createdAt: { is: 'date' }
-  },
-  obfuscateConfig:{
-    metadataCollectionName: 'userObfuscateMetaData'
   }
 }) as UserCollection;
 ```
@@ -67,7 +64,9 @@ await Tyr.encryptCollection(copiedPIICollection, masterKey);
 
 - Next apply static replacement values to all of the selected records in `User`. Provide the same query to mask a subset of records in `User`.  The field name to value object specified for `replacementValues` will replace the data in the `User` collection with the specified values.  
 
-- Each record affected will have a corresponding entry in the metadata collection that can be queried to determine fictitious values in the `User` collection. 
+- Each record affected will have a corresponding entry in the metadata collection that can be queried to determine fictitious values in the `User` collection. The metadata collection will be named by appending the provided `metadataSuffix` value to the given collection.  In the below example, collection `user` will have a metadata collection name of `user__metadata`;
+
+
 
 ```ts
 // Again, mask the first ten records
@@ -80,7 +79,8 @@ const opts: Tyr.ObfuscateBatchOpts = {
         firstName: 'John',
         lastName: 'Doe',
         ip_address: '0.0.0.0'
-    }
+    },
+    metadataSuffix: '__metadata'
 };
 
 const batchResults: Tyr.ObfuscateBatchResult = await Tyr.obfuscate(opts);

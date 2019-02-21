@@ -96,9 +96,11 @@ test.serial('Should encrypt given collection', async t => {
 test.serial('Should obfuscate first ten users and replace with static values', async t => {
   const numberToAffect = 10;
   const maskValues = { firstName: 'USER', lastName: 'x', ip_address: '0.0.0.0' };
+  const metaDataSuffix = '__metadata';
   const query = { _id: { $lte: numberToAffect } };
   const opts: Tyr.ObfuscateBatchOpts = {
     query: query,
+    metadataSuffix: metaDataSuffix,
     collection: User,
     replacementValues: {
       'firstName': maskValues.firstName,
@@ -113,7 +115,7 @@ test.serial('Should obfuscate first ten users and replace with static values', a
   t.deepEqual(JSON.stringify(alteredRecords), ExpectedResults.MaskPIIWithStaticValues, 'Result PII fields not blank as expected');
 
   // Validate MetaData
-  const metaDataCollection: Collection<Tyr.ObfuscateMetaDataSchema> = await Tyr.db.collection(User.def.dbName + '__meta');
+  const metaDataCollection: Collection<Tyr.ObfuscateMetaDataSchema> = await Tyr.db.collection(User.def.dbName + metaDataSuffix);
 
   t.true((metaDataCollection !== null && metaDataCollection !== undefined), 'Could not locate metadata collection for User');
 

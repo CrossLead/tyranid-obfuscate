@@ -21,7 +21,7 @@ export interface User extends Tyr.Document<ObjectID> {
  * Type 'User' is missing the following properties from type 
  * 'ObjectID': generationTime, equals, generate, getTimestamp, toHexString
  */
-export interface UserCollection extends Tyr.ObfuscateableCollectionInstance {
+export interface UserCollection extends Tyr.CollectionInstance<ObjectID, User> {
 };
 
 
@@ -37,9 +37,6 @@ export const User = new Tyr.Collection({
     gender: { is: 'string' },
     ip_address: { is: 'string', obfuscateable:true,  required: true},
     createdAt: { is: 'date' }
-  },
-  obfuscateConfig:{
-    metadataCollectionName: 'userObfuscateMetaData'
   }
 }) as UserCollection;
 
@@ -73,9 +70,8 @@ export class DBManager {
     // Still need this explicit even when validate set on config 
     await Tyr.validate();
 
-
     await User.insert(TestDataSet);
-    console.log(`Database Up, Collections ${Tyr.collections}`);
+
     return this.db;
   }
 

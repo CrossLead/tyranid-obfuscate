@@ -1,4 +1,4 @@
-import { Tyr, ObjectID } from 'tyranid';
+import { Tyr } from 'tyranid';
 import { ObjectId, Collection } from 'mongodb';
 
 /**
@@ -90,6 +90,12 @@ declare module 'tyranid' {
             collection: ObfuscateableCollectionInstance,
 
             /**
+             * String appended to the given collection name to designate the 
+             * metadata collection
+             */
+            metadataSuffix: string;
+
+            /**
              * Optionally specify a collecton that contains records with the associated masked records _id field
              * Fields on the record not specified here will not be altered.
              * 
@@ -115,20 +121,6 @@ declare module 'tyranid' {
             
         }
 
-        export interface ObfuscateCollectionConfig {
-            metadataCollectionName: string;
-        }
-        interface CollectionDefinitionHydrated {
-            obfuscateConfig: string;
-        }
-
-        /**
-         * This won't work
-         */
-        export interface ObfuscateableCollectionInstance extends CollectionInstance<IdType, T> {
-            obfuscateConfig: ObfuscateCollectionConfig;
-        }
-
         /**
          * Will probably need an overall batch table that relates to the data run for that batch
          */
@@ -147,10 +139,6 @@ declare module 'tyranid' {
              */
             batchTag: ObjectId;
         }
-
-
-        export interface ObfuscateMetaDataCollection extends Tyr.CollectionInstance<ObjectID, ObfuscateMetaDataSchema> {
-        };
 
         interface FieldInstance {
             obfuscateable: string;

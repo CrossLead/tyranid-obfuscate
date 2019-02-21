@@ -19,14 +19,14 @@ interface FieldObject {
  * TODO: Really large Document support with GridFS API
  */
 Tyr.obfuscate = async (opts: Tyr.ObfuscateBatchOpts): Promise<Tyr.ObfuscateBatchResult> => {
-  const { collection, query, replacementValues, replacementValCollection } = opts;
+  const { collection, query, replacementValues, replacementValCollection, metadataSuffix } = opts;
 
   const sourceCollectionName: string = collection.def.dbName;
   const mongoSrcCollection: Collection = Tyr.db.collection(sourceCollectionName);
 
   // Complicated extending Tyr.Collection to have configurable name
   // Going with convention for now
-  const metaCollecName = metaDataNameForCollection(sourceCollectionName);
+  const metaCollecName = `${sourceCollectionName}${metadataSuffix}`;
   const metaDataCollection: Collection = await getMetaDataCollection(metaCollecName);
   
   const obfsctFields = obfuscateableFieldsFromCollection(collection);
@@ -36,7 +36,7 @@ Tyr.obfuscate = async (opts: Tyr.ObfuscateBatchOpts): Promise<Tyr.ObfuscateBatch
 
 //TBD: Maybe part out to an internal Tyr collection to collection migration fn
 //TBD: Error handling
-Tyr.copyObfuscateableData = async (query: Tyr.MongoQuery, sourceCollection: Tyr.ObfuscateableCollectionInstance, targetCollection: Tyr.CollectionInstance ) => {
+Tyr.copyObfuscateableData = async (query: Tyr.MongoQuery, sourceCollection: Tyr.CollectionInstance, targetCollection: Tyr.CollectionInstance ) => {
   Tyr.info(`Migrating obfuscateable fields from ${sourceCollection.name} to ${targetCollection.name} `);
   const projection = projectionForObfuscateableFields(sourceCollection);
 
@@ -162,7 +162,7 @@ const migrateData = async (targetCollection: Tyr.CollectionInstance, sourceColle
 //   collection.db.mapReduce(mapFunction, reduceFunction);
 // }
 
-const projectionForObfuscateableFields = (collection: Tyr.ObfuscateableCollectionInstance): object => {
+const projectionForObfuscateableFields = (collection: Tyr.CollectionInstance): object => {
   const obfsctFields = obfuscateableFieldsFromCollection(collection);
   let projection: any = {};
 
@@ -172,7 +172,7 @@ const projectionForObfuscateableFields = (collection: Tyr.ObfuscateableCollectio
   return projection;
 }
 
-const obfuscateableFieldsFromCollection = (collection: Tyr.ObfuscateableCollectionInstance): Array<string> => {
+const obfuscateableFieldsFromCollection = (collection: Tyr.CollectionInstance): Array<string> => {
   const names: Array<string> = [];
   for (const fieldName in collection.def.fields) {
     if (collection.def.fields[fieldName].def.obfuscateable) {
@@ -181,9 +181,7 @@ const obfuscateableFieldsFromCollection = (collection: Tyr.ObfuscateableCollecti
   }
   return names;
 }
-const metaDataNameForCollection = (tyrCollectDbName: string):string => {
-  return `${tyrCollectDbName}__meta`
-}
+
 const getMetaDataCollection = async (name: string): Promise<Collection> => {
   const existingCollection = await Tyr.db.collection(name);
   if (!existingCollection) {
