@@ -3,19 +3,22 @@
 import { Tyr } from "tyranid";
 import { Cursor, Collection, FilterQuery, BulkWriteResult, UpdateWriteOpResult, UnorderedBulkOperation } from "mongodb";
 import { Timestamp, ObjectId, ObjectID } from 'bson';
-import { spawn } from 'child_process';
+import { AesUtil } from '../src/encryptor';
+import { emit } from "cluster";
 
 const defaultBatchSize = 500;
 const idOnlyProjection = { _id: 1 };
 interface IdRecord {
   _id: ObjectID
 }
+interface FieldObject {
+  [name: string]: string;
+}
 
 /**
  * TODO: Really large Document support with GridFS API
  */
 Tyr.obfuscate = async (opts: Tyr.ObfuscateBatchOpts): Promise<Tyr.ObfuscateBatchResult> => {
-
   const { collection, query, replacementValues, replacementValCollection } = opts;
 
   const sourceCollectionName: string = collection.def.dbName;
@@ -28,9 +31,7 @@ Tyr.obfuscate = async (opts: Tyr.ObfuscateBatchOpts): Promise<Tyr.ObfuscateBatch
   
   const obfsctFields = obfuscateableFieldsFromCollection(collection);
 
-
   return await createBatchMetaData(obfsctFields, mongoSrcCollection, metaDataCollection, query, replacementValues, replacementValCollection);
-
 };
 
 //TBD: Maybe part out to an internal Tyr collection to collection migration fn
@@ -59,6 +60,108 @@ Tyr.copyObfuscateableData = async (query: Tyr.MongoQuery, sourceCollection: Tyr.
   Tyr.info(`Completed migration of obfuscateable fields from ${sourceCollection.name} to ${targetCollection.name}`);
 }
 
+// Probably not as efficient as mapreduce
+// TODO: recovery of mid encryption failure
+// TODO: trace logging
+Tyr.encryptCollection = async (collection: Tyr.CollectionInstance, masterKey: string) => {
+  await encryptDecryptData(collection, masterKey, false);
+}
+
+const encryptDecryptData = async (collection: Tyr.CollectionInstance, masterKey: string, decrypt?: boolean) => {
+
+  const aesUtil = new AesUtil(masterKey);
+  const cursor = await collection.db.find({});
+  let bulkOp = collection.db.initializeUnorderedBulkOp();
+
+  const count = await cursor.count();
+  let doc;
+  for (let i = 1; i <= count; i++) {
+    doc = await cursor.next();
+
+    bulkOp.find({ _id: doc._id }).update({ $set: encryptDocument(doc, aesUtil, decrypt) });
+
+    if ((i % defaultBatchSize === 0) || i === count) {
+      Tyr.info('Flushing encrypted batch');
+      const result: BulkWriteResult = await bulkOp.execute();
+
+      if (!result.ok) {
+        throw new Error(`Encryption of collection failed`)
+      }
+      bulkOp = collection.db.initializeUnorderedBulkOp();
+    }
+  }
+}
+// TODO: Need to think of wording
+const encryptDocument = (doc: any, aesUtil: AesUtil, decrypt?: boolean): object => {
+  //TODO: figure out better approach to typing obj
+  let encObj: any = {};
+
+  Object.getOwnPropertyNames(doc).forEach(key => {
+    if (key !== "_id") {
+      //Encryption util is simplistic right now
+      //should replace with established library
+      encObj[key] = decrypt ? aesUtil.decrypt(doc[key]) : aesUtil.encryptString(doc[key]);
+    }
+  });
+
+  return encObj;
+}
+
+Tyr.restoreObfuscatedData = async (targetCollection: Tyr.CollectionInstance, sourceCollection: Tyr.CollectionInstance, query ?: Tyr.MongoQuery, decryptionKey ?: string) => {
+  //decrypt collection
+  if (decryptionKey) {
+    // need better method naming
+    // TODO: Doesn't support subset
+    await encryptDecryptData(sourceCollection, decryptionKey, true);
+  }
+  //migrate data back to targetCollection
+  await migrateData(targetCollection, sourceCollection, query);
+
+}
+
+const migrateData = async (targetCollection: Tyr.CollectionInstance, sourceCollection: Tyr.CollectionInstance, query?: Tyr.MongoQuery) => {
+  const q = query ? query : {};
+  const cursor = await sourceCollection.db.find(q);
+  let bulkOp = targetCollection.db.initializeUnorderedBulkOp();
+
+  const count = await cursor.count();
+  let doc;
+  for (let i = 1; i <= count; i++) {
+    doc = await cursor.next();
+
+    bulkOp.find({ _id: doc._id }).update({ $set: doc });
+
+    if ((i % defaultBatchSize === 0) || i === count) {
+      Tyr.info('Flushing encrypted batch');
+      const result: BulkWriteResult = await bulkOp.execute();
+
+      if (!result.ok) {
+        throw new Error(`Failed migration of collection ${sourceCollection.name} to ${targetCollection.name} \n ${JSON.stringify(result.getWriteErrors())}`);
+      }
+      bulkOp = targetCollection.db.initializeUnorderedBulkOp();
+    }
+  }
+}
+
+// MapReduce attempt, not sure how to specify dynamic fields.
+// Tyr.encryptCollection = async (collection: Tyr.CollectionInstance, masterKey: string) => {
+//   const mapFunction = () => {
+//     let key = this._id;
+//     let vals = {};
+
+//     Object.getOwnPropertyNames(collection.def.fields).forEach(key => {
+//        vals[key] =
+//       //use key and value here
+//     });
+
+//     emit(key, vals );
+//   };
+//   const reduceFunction = () => {
+
+//   }
+//   collection.db.mapReduce(mapFunction, reduceFunction);
+// }
+
 const projectionForObfuscateableFields = (collection: Tyr.ObfuscateableCollectionInstance): object => {
   const obfsctFields = obfuscateableFieldsFromCollection(collection);
   let projection: any = {};
@@ -83,20 +186,15 @@ const metaDataNameForCollection = (tyrCollectDbName: string):string => {
 }
 const getMetaDataCollection = async (name: string): Promise<Collection> => {
   const existingCollection = await Tyr.db.collection(name);
-
   if (!existingCollection) {
     return createMetaDataCollection(name);
   }
   return existingCollection;
 }
 
-// Might be best to make metadata outside of Tyranid
+//TODO: probably remove, up to consumer to provide collection
 const createMetaDataCollection = async (name: string): Promise<Collection> => {
   return await Tyr.db.createCollection<Tyr.ObfuscateMetaDataSchema>(name, { autoIndexId: true });
-}
-
-interface FieldObject {
-  [name: string]: string;
 }
 
 const createBatchMetaData = async (fields: Array<string>, srcCollection: Collection,
@@ -152,6 +250,7 @@ const createBatchMetaData = async (fields: Array<string>, srcCollection: Collect
   return { batchTag: batchTag, count: count };
 }
 
+// TODO: Implement
 const applyMaskValuesFromCollection = (recordIds: any[], replaceValCollection: Collection, targetCollection: Collection): Promise<BulkWriteResult> =>{
   const bulkUpdate = targetCollection.initializeUnorderedBulkOp();
   const replaceValPointer = replaceValCollection.find({_id: {}})
@@ -166,6 +265,4 @@ const applyMaskValuesFromCollection = (recordIds: any[], replaceValCollection: C
 
 export const validate = () => { 
   //TDB: Validate obfuscate config
-  // console.log(`PROTOTYPE: ${JSON.stringify(Tyr.documentPrototype)}`);
-// Tyr.documentPrototype.PROTOTYPE = 'test';
 };

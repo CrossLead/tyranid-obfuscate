@@ -1,12 +1,26 @@
 import test from 'ava';
-import { Collection, ObjectID } from 'mongodb';
+import { Collection, ObjectID, ObjectId } from 'mongodb';
 import { Tyr } from 'tyranid';
 import TestDataSet from './datasets/users';
 import { DBManager, User } from './util';
 import {ExpectedResults, createMaskingValuesCollection } from './datasets/expected-results';
 import * as fs from 'fs';
+import { isTypeQueryNode } from 'typescript';
 
 let dbManager: DBManager;
+const masterKey = '123456';
+const copiedPIICollection = new Tyr.Collection({
+  id: '_c1',
+  name: 'copypasta',
+  dbName: 'copypasta',
+  internal: false,
+  fields: {
+    _id: { is: 'mongoid' },
+    firstName: { is: 'string' },
+    lastName: { is: 'string' },
+    ip_address: { is: 'string' }
+  }
+});
 
 const logObj = (input: any) => {
   console.log(JSON.stringify(input));
@@ -54,27 +68,30 @@ test('Should have obfuscate function on Tyr namespace', t => {
 
 /**
  * Test Obfuscation
+ * 
+ * 
+ * TODO Test Cases
+ *   1. Should complete exporting, encryption, and recovery with datasize that requires more than one batch
+ *   2. ALL error scenarios and recovery
+ *   3. Complex datatypes, arrays, objects, etc
+ *   4. Test null data types, missing fields
  */
-    //TODO:
-    //TEST Array, complext data types
 
 test.serial('Should copy obfuscateable data to temp collection', async t => {
-  const copyResultCollection = new Tyr.Collection({
-    id: '_c1',
-    name: 'copypasta',
-    dbName: 'copypasta',
-    internal: false,
-    fields: {
-      _id: { is: 'mongoid' },
-      firstName: { is: 'string' },
-      lastName: { is: 'string' },
-      ip_address: { is: 'string'}
-    }
-  });
-  const query = { _id: { $lte: 10 } }; // Copy first ten records
-  await Tyr.copyObfuscateableData(query, Tyr.byName.user, copyResultCollection);
-  const copiedData = (await copyResultCollection.findAll({ query: {  } }));
+  const collection = await createFreshCopyOfData(); 
+  const copiedData = (await collection.findAll({ query: {  } }));
   t.deepEqual(JSON.stringify(copiedData), ExpectedResults.CopiedObfuscateableData, 'Obfuscateable data incorrectly copied to new collection');
+});
+
+test.serial('Should encrypt given collection', async t => {
+  //Create collection of values
+  const collection = await createFreshCopyOfData();
+
+  const resultTBD = await Tyr.encryptCollection(collection, masterKey);
+
+  const records = await collection.findAll({ query: {} });
+  t.true(records.length === 10, 'All records still in collection');
+  t.notDeepEqual(JSON.stringify(records), ExpectedResults.CopiedObfuscateableData, 'Data not encrypted');
 });
 
 test.serial('Should obfuscate first ten users and replace with static values', async t => {
@@ -117,6 +134,20 @@ test.serial('Should obfuscate first ten users and replace with static values', a
 
 });
 
+// TODO: for right now this will depend on the side effects of the previous tests.
+test.serial('Should restore obfuscated data to original state', async t => {
+  //verify that data is masked to begin with
+  const maskedData = JSON.stringify(await User.findAll({ query: { _id: {$lte: 10}} }));
+  t.deepEqual(maskedData, ExpectedResults.MaskPIIWithStaticValues, 'Not starting with masked data');
+
+  const query: Tyr.MongoQuery = {};
+  await Tyr.restoreObfuscatedData(Tyr.byName.user, copiedPIICollection, query, masterKey);
+
+  const restoredData = JSON.stringify(await User.findAll({ query: { _id: { $lte: 10 } } }));
+  t.deepEqual(restoredData, ExpectedResults.OriginalFirstTenRecords, 'Data not restored properly');
+
+});
+
 // test.serial('Should use collection to mask data', async t => {
 //   const maskCollection = await createMaskingValuesCollection();
 //   const query = { _id: { $in: [11, 12, 13, 14, 15] }};
@@ -154,9 +185,21 @@ test.serial('Should obfuscate first ten users and replace with static values', a
 //   }
 // });
 
-// test('Should be able to export, obfuscate, then re-import data', async t => {
-//   t.fail('TBD: Implement');
-// });
+/**
+ * 
+ * Defaults to the firts ten records
+ * @param startIndex 
+ * @param endIndex 
+ */
+const createFreshCopyOfData = async (startIndex?: number, endIndex?: number): Promise<Tyr.CollectionInstance> => {
+  startIndex = startIndex ? startIndex : 0;
+  endIndex = endIndex ? endIndex : 10; 
+
+  const query ={ $and: [{ _id: { $gte: startIndex } }, { _id: { $lte: endIndex } }] } ;
+
+  await Tyr.copyObfuscateableData(query, Tyr.byName.user, copiedPIICollection);
+  return copiedPIICollection;
+}
 
 test.after('Shut down server', t => {
   return dbManager.stop();

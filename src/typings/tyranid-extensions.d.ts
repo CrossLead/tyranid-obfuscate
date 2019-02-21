@@ -20,7 +20,13 @@ declare module 'tyranid' {
         export function obfuscate(opts: ObfuscateBatchOpts): Promise<ObfuscateBatchResult>;
         
         /**
+         * TODO: $out fn used can only replace data in collection previous
+         *  to v4.2, multiple runs will right now replace entire dataset
+         *  Workaround: create multiple collections for each obfuscation batch run
          * 
+         * Copy data from fields marked as 'obfuscateable' from 
+         * source collection to target collection
+         * The source _id field will also be copied to the target
          * 
          * @param query selector for which records to 
          * @param sourceCollection 
@@ -28,7 +34,32 @@ declare module 'tyranid' {
          */
         export function copyObfuscateableData(query: MongoQuery, sourceCollection: Tyr.CollectionInstance, targetCollection: Tyr.CollectionInstance);
 
+        /**
+         * TODO: Uses very simplistic encryption, find library
+         * TODO: If updated to use Auth Tags, how to persist?
+         * 
+         * Encrypts the field values of the provided collection utilizing AES
+         * Does not encrypt the _id field
+         * 
+         * @param targetCollection Collection to encrypt
+         * @param masterKey string key to use for encryption, must be preserved for decryption
+         * 
+         */
+        export function encryptCollection(targetCollection: Tyr.CollectionInstance, encryptionKey: string);
 
+        /**
+         * TODO: Still need to figure out how to tie metadata collection to target
+         *              For now just explicitly pass in collections
+         * TODO: When restoring, what do we want to do with metadata? 
+         * 
+         * Restores data that was masked to its original state
+         * 
+         * @param targetCollection Collection to have data inserted into
+         * @param sourceCollection Collection that data will be pulled from
+         * @param query optionally specify subset of data to restore, if no query specified all records will be replaced
+         * @param decryptionKey Decryption key for the supplied data if it is encrypted.
+         */
+        export function restoreObfuscatedData(targetCollection: Tyr.CollectionInstance, sourceCollection: Tyr.CollectionInstance, query?: Tyr.MongoQuery, decryptionKey?: string)
         export interface ObfuscateBatchConfig {
             metadataCollectionName: string
 
