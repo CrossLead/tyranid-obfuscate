@@ -143,10 +143,6 @@ declare module 'tyranid' {
             fields: Array<string>; //Names of fields that were obfuscated
 
             /**
-             * Optionally store
-             */
-            encryptedData?: object;
-            /**
              * Uniquie Identifier for individual batch run
              */
             batchTag: ObjectId;
