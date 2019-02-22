@@ -2,24 +2,16 @@
   "compilerOptions": {
     "declaration": true,
     "module": "commonjs",
+    "skipLibCheck": true,
     "moduleResolution": "node",
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "target": "es2015",
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "outDir": "./lib",
     "preserveConstEnums": true,
     "removeComments": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "**/*-spec.ts"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*-spec.ts"]
 }

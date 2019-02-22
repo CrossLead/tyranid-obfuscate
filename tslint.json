@@ -2,5 +2,9 @@
   "extends": [
     "tslint:latest",
     "tslint-config-prettier"
-  ]
+  ],
+  "rules": {
+    "interface-name": false, //don't force 'I{name}' for interface
+    "no-reference": false, //use for tripple slash reference
+  }
 }
