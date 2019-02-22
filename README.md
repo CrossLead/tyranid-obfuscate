@@ -26,7 +26,7 @@ export const User = new Tyr.Collection({
 }) as UserCollection;
 ```
 
-- Add a call to `TyrObfuscator.validate();` after calling `Tyr.validate();`, this will ensure that fields marked `obfusvcateable` are valid
+- Add a call to `TyrObfuscator.validate();` after calling `Tyr.validate();`, this will ensure that fields marked `obfuscateable` are valid
 
 ```ts
 Tyr.validate();

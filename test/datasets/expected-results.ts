@@ -1,11 +1,11 @@
 import { Tyr } from 'tyranid';
 import { Collection } from 'mongodb';
 
-const collectionMaskValues = [{ id_: 11, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.1' },
-    { id_: 12, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.2' },
-    { id_: 13, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.3' },
-    { id_: 14, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.1' },
-    { id_: 15, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.4' },];
+const collectionMaskValues = [{ _id: 11, firstName: 'id_1Name', lastName: 'test_lastname', ip_address: '1.1.1.1' },
+    { _id: 12, firstName: 'id_2Name', lastName: 'test_lastname1', ip_address: '1.1.1.2' },
+    { _id: 13, firstName: 'id_3Name', lastName: 'test_lastname2', ip_address: '1.1.1.3' },
+    { _id: 14, firstName: 'id_4Name', lastName: 'test_lastname3', ip_address: '1.1.1.1' },
+    { _id: 15, firstName: 'id_5Name', lastName: 'test_lastname4', ip_address: '1.1.1.4' },];
 
 export const ExpectedResults = {
     MaskPIIWithStaticValues: '[{"_id":1,"email":"ncroasdale0@cpanel.net","firstName":"USER","lastName":"x","gender":"Male","ip_address":"0.0.0.0","createdAt":"6/30/2018"},' +
@@ -19,7 +19,11 @@ export const ExpectedResults = {
         '{"_id":9,"email":"lrijkeseis8@deviantart.com","firstName":"USER","lastName":"x","gender":"Female","ip_address":"0.0.0.0","createdAt":"1/3/2019"},' +
         '{"_id":10,"email":"lyashnov9@howstuffworks.com","firstName":"USER","lastName":"x","gender":"Female","ip_address":"0.0.0.0","createdAt":"11/19/2018"}]',
     
-    MaskPIIWithCollectionValues: (JSON.stringify(collectionMaskValues)),
+    MaskPIIWithCollectionValues: '[{"_id":11,"email":"jcockrilla@blogspot.com","firstName":"id_1Name","lastName":"test_lastname","gender":"Male","ip_address":"1.1.1.1","createdAt":"1/28/2019"},' +
+        '{"_id":12,"email":"aorringeb@ox.ac.uk","firstName":"id_2Name","lastName":"test_lastname1","gender":"Female","ip_address":"1.1.1.2","createdAt":"4/15/2018"},' +
+        '{"_id":13,"email":"amalsterc@epa.gov","firstName":"id_3Name","lastName":"test_lastname2","gender":"Male","ip_address":"1.1.1.3","createdAt":"4/4/2018"},' +
+        '{"_id":14,"email":"jmcelweed@t-online.de","firstName":"id_4Name","lastName":"test_lastname3","gender":"Male","ip_address":"1.1.1.1","createdAt":"3/18/2018"},' +
+        '{"_id":15,"email":"ttateme@bizjournals.com","firstName":"id_5Name","lastName":"test_lastname4","gender":"Female","ip_address":"1.1.1.4","createdAt":"8/10/2018"}]',
 
     CopiedObfuscateableData: '[{"_id":1,"firstName":"Nye","lastName":"Croasdale","ip_address":"173.155.66.90"},' +
         '{"_id":2,"firstName":"Coleman","lastName":"Rooper","ip_address":"203.52.25.41"},' +

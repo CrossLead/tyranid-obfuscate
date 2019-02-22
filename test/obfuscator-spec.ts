@@ -149,42 +149,43 @@ test.serial('Should restore obfuscated data to original state', async t => {
 
 });
 
-// test.serial('Should use collection to mask data', async t => {
-//   const maskCollection = await createMaskingValuesCollection();
-//   const query = { _id: { $in: [11, 12, 13, 14, 15] }};
+test.serial('Should use collection to mask data', async t => {
+  const maskCollection = await createMaskingValuesCollection();
+  const query = { _id: { $in: [11, 12, 13, 14, 15] }};
+  const metadataSuffix = '__MetaData2';
 
-//   const opts: Tyr.ObfuscateBatchOpts = {
-//     query: query,
-//     collection: User,
-//     replacementValCollection: maskCollection
-//   };
+  const opts: Tyr.ObfuscateBatchOpts = {
+    query: query,
+    collection: User,
+    replacementValCollection: maskCollection,
+    metadataSuffix: metadataSuffix
+  };
 
-//   const batchResults: Tyr.ObfuscateBatchResult = await Tyr.obfuscate(opts);
+  const batchResults: Tyr.ObfuscateBatchResult = await Tyr.obfuscate(opts);
 
-//   /** Validate obfuscation */
-//   const alteredRecordsPointer = await User.find({ query: query });
-//   const alteredRecords = await (alteredRecordsPointer).toArray();
-//   t.deepEqual(JSON.stringify(alteredRecords), ExpectedResults.MaskPIIWithCollectionValues, 'Result PII fields not migrated from given collection');
+  /** Validate obfuscation */
+  const alteredRecords = await User.findAll({ query: query });
+  t.deepEqual(JSON.stringify(alteredRecords), ExpectedResults.MaskPIIWithCollectionValues, 'Result PII fields not migrated from given collection');
 
-//   /** Validate meta data */
-//   const metaDataCollection: Collection<Tyr.ObfuscateMetaDataSchema> = await Tyr.db.collection(User.def.dbName + '__meta');
+  /** Validate meta data */
+  const metaDataCollection: Collection<Tyr.ObfuscateMetaDataSchema> = await Tyr.db.collection(User.def.dbName + metadataSuffix);
 
-//   t.true((metaDataCollection !== null && metaDataCollection !== undefined), 'Could not locate metadata collection for User');
+  t.true((metaDataCollection !== null && metaDataCollection !== undefined), 'Could not locate metadata collection for User');
 
-//   const metaRecords = await (await metaDataCollection.find({ batchTag: batchResults.batchTag })).toArray();
+  const metaRecords = await (await metaDataCollection.find({ batchTag: batchResults.batchTag })).toArray();
 
-//   let r: Tyr.ObfuscateMetaDataSchema;
-//   // Not sure how to mock mongo's ObjectID() so cannot do a exact dataset comparison
-//   for (let i = 0; i < metaRecords.length; i++) {
-//     r = metaRecords[i];
+  let r: Tyr.ObfuscateMetaDataSchema;
+  // Not sure how to mock mongo's ObjectID() so cannot do a exact dataset comparison
+  for (let i = 0; i < metaRecords.length; i++) {
+    r = metaRecords[i];
 
-//     //Not quite sure how to get id to string
-//     t.deepEqual(JSON.stringify(r.recordId), ((i + 11) + ''), 'metadata has incorrect associated record id');
-//     t.deepEqual(JSON.stringify(r.fields), '["firstName","lastName","ip_address"]', 'metadata has incorrectly saved which fields were obfuscated');
-//     //Technically this shouldn't happen
-//     t.deepEqual(r.batchTag, batchResults.batchTag, 'Incorrect batch tag');
-//   }
-// });
+    //Not quite sure how to get id to string
+    t.deepEqual(JSON.stringify(r.recordId), ((i + 11) + ''), 'metadata has incorrect associated record id');
+    t.deepEqual(JSON.stringify(r.fields), '["firstName","lastName","ip_address"]', 'metadata has incorrectly saved which fields were obfuscated');
+    //Technically this shouldn't happen
+    t.deepEqual(r.batchTag, batchResults.batchTag, 'Incorrect batch tag');
+  }
+});
 
 /**
  * 

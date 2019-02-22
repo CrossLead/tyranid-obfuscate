@@ -2,9 +2,8 @@
 
 import { Tyr } from "tyranid";
 import { Cursor, Collection, FilterQuery, BulkWriteResult, UpdateWriteOpResult, UnorderedBulkOperation } from "mongodb";
-import { Timestamp, ObjectId, ObjectID } from 'bson';
+import { ObjectID } from 'bson';
 import { AesUtil } from './encryptor';
-import { emit } from "cluster";
 
 const defaultBatchSize = 500;
 const idOnlyProjection = { _id: 1 };
@@ -31,7 +30,7 @@ Tyr.obfuscate = async (opts: Tyr.ObfuscateBatchOpts): Promise<Tyr.ObfuscateBatch
   
   const obfsctFields = obfuscateableFieldsFromCollection(collection);
 
-  return await createBatchMetaData(obfsctFields, mongoSrcCollection, metaDataCollection, query, replacementValues, replacementValCollection);
+  return createBatchMetaData(obfsctFields, mongoSrcCollection, metaDataCollection, query, replacementValues, replacementValCollection);
 };
 
 //TBD: Maybe part out to an internal Tyr collection to collection migration fn
@@ -116,30 +115,33 @@ Tyr.restoreObfuscatedData = async (targetCollection: Tyr.CollectionInstance, sou
     await encryptDecryptData(sourceCollection, decryptionKey, query, true);
   }
   //migrate data back to targetCollection
-  await migrateData(targetCollection, sourceCollection, query);
+  await migrateData(targetCollection.db, sourceCollection.db, query);
 
 }
 
-const migrateData = async (targetCollection: Tyr.CollectionInstance, sourceCollection: Tyr.CollectionInstance, query?: Tyr.MongoQuery) => {
+const migrateData = async (targetCollection: Collection, sourceCollection: Collection, query?: Tyr.MongoQuery) => {
   const q = query ? query : {};
-  const cursor = await sourceCollection.db.find(q);
-  let bulkOp = targetCollection.db.initializeUnorderedBulkOp();
+  const cursor = await sourceCollection.find(q);
+  let bulkOp: UnorderedBulkOperation = targetCollection.initializeUnorderedBulkOp();
 
   const count = await cursor.count();
+
   let doc;
   for (let i = 1; i <= count; i++) {
     doc = await cursor.next();
+    console.log(await (await targetCollection.find({ _id: doc._id })).toArray());
 
+    // console.log(`DOC: ${JSON.stringify(doc)}`);
     bulkOp.find({ _id: doc._id }).update({ $set: doc });
 
     if ((i % defaultBatchSize === 0) || i === count) {
-      Tyr.info('Flushing encrypted batch');
+      Tyr.info('Flushing bulk update batch');
       const result: BulkWriteResult = await bulkOp.execute();
 
       if (!result.ok) {
-        throw new Error(`Failed migration of collection ${sourceCollection.name} to ${targetCollection.name} \n ${JSON.stringify(result.getWriteErrors())}`);
+        throw new Error(`Failed migration of collection ${sourceCollection.collectionName} to ${targetCollection.collectionName} \n ${JSON.stringify(result.getWriteErrors())}`);
       }
-      bulkOp = targetCollection.db.initializeUnorderedBulkOp();
+      bulkOp = targetCollection.initializeUnorderedBulkOp();
     }
   }
 }
@@ -228,39 +230,29 @@ const createBatchMetaData = async (fields: Array<string>, srcCollection: Collect
         console.log(`MetaData Error: ${JSON.stringify(error)}`);
       }
 
-      if (!replaceVals) {
+      if (replaceValCollection) {
         //Move data from given collection to be mask
-        applyMaskValuesFromCollection(batchRecIds, replaceValCollection, srcCollection);
+        await migrateData(srcCollection, replaceValCollection, { _id: { $in: batchRecIds } });
       }
 
       bulkMetaData = targetCollection.initializeUnorderedBulkOp();
     }
   }
 
-  try {
-    //Static replacement values can be applied at once
-    const maskResult: UpdateWriteOpResult = await srcCollection.updateMany(query, { $set: replaceVals });
-  } catch (error) {
-    console.log(`Masking Error: ${JSON.stringify(error)}`);
+  if (replaceVals) {
+    try {
+      //Static replacement values can be applied at once
+      const maskResult: UpdateWriteOpResult = await srcCollection.updateMany(query, { $set: replaceVals });
+    } catch (error) {
+      console.log(`Masking Error: ${JSON.stringify(error)}`);
+    }
   }
+
   Tyr.info(`Finished obfuscating collection ${srcCollection.namespace} tag ${batchTag}`);
 
   // TODO: Get count from batch results
   return { batchTag: batchTag, count: count };
 }
-
-// TODO: Implement
-const applyMaskValuesFromCollection = (recordIds: any[], replaceValCollection: Collection, targetCollection: Collection): Promise<BulkWriteResult> =>{
-  const bulkUpdate = targetCollection.initializeUnorderedBulkOp();
-  const replaceValPointer = replaceValCollection.find({_id: {}})
-  // recordIds.forEach(id => {
-  //   bulkUpdate.find()
-  //  });
-  // bulkUpdate.push
-
-  return bulkUpdate.execute();
-}
-
 
 export const validate = () => { 
   //TDB: Validate obfuscate config

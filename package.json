@@ -2,7 +2,7 @@
   "name": "tyranid-obfuscate",
   "version": "0.0.1",
   "description": "tyranid-obfuscate",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git@github.com:CrossLead/tyranid-obfuscate.git"
